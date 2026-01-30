@@ -5,6 +5,7 @@ Feltételezés: PCD-ben oszlopok: x y z label (ASCII vagy bináris).
 """
 import argparse
 import json
+import zlib
 from pathlib import Path
 import numpy as np
 
@@ -97,8 +98,18 @@ def load_pcd(path: Path):
     elif data_type == "binary":
         dtype = make_dtype(meta)
         data = np.frombuffer(raw, offset=data_offset, dtype=np.dtype({"names": fields, "formats": dtype}))
+    elif data_type == "binary_compressed":
+        # PCL binary_compressed: 4B compressed size, 4B uncompressed size, then zlib data
+        comp_size = np.frombuffer(raw, offset=data_offset, dtype=np.uint32, count=1)[0]
+        uncomp_size = np.frombuffer(raw, offset=data_offset + 4, dtype=np.uint32, count=1)[0]
+        comp_data = raw[data_offset + 8 : data_offset + 8 + comp_size]
+        buf = zlib.decompress(comp_data)
+        if len(buf) != uncomp_size:
+            raise ValueError(f"Decompressed size mismatch: expected {uncomp_size}, got {len(buf)}")
+        dtype = make_dtype(meta)
+        data = np.frombuffer(buf, dtype=np.dtype({"names": fields, "formats": dtype}))
     else:
-        raise ValueError(f"DATA {data_type} nem támogatott (binary_compressed esetén konvertálni kell)")
+        raise ValueError(f"DATA {data_type} nem támogatott")
 
     if data_type == "binary":
         x = np.asarray(data[fields[xi]], dtype=np.float32)
