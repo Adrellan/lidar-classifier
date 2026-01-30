@@ -111,7 +111,8 @@ def load_pcd(path: Path):
         pts = data[:, [xi, yi, zi]]
         lbl = data[:, li].astype(np.int64)
 
-    lbl = np.vectorize(CLASS_MAP.get, otypes=[int])(lbl)
+    # Map to 5 osztály, ismeretlen kód -> 4 (other)
+    lbl = np.array([CLASS_MAP.get(int(v), 4) for v in lbl], dtype=np.int64)
     return pts, lbl
 
 
