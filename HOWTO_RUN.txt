@@ -1,0 +1,26 @@
+Lépések, ha már a train_data-ban vannak a .las/.laz fájlok
+
+1) Virtuális környezet aktiválása
+   source .venv/bin/activate
+
+2) Előfeldolgozás (csempézés)
+   bash scripts/preprocess.sh train_data exp/tiles
+   - Bemenet: train_data (LAS/LAZ)
+   - Kimenet: exp/tiles (npy-k, train/val/test split)
+
+3) Tanítás GPU-val (RandLA-Net)
+   bash scripts/train.sh
+   - A configs/randla_hungary.yaml konfigurációt használja
+   - Logok, checkpointok: exp/logs alatt
+
+4) TensorBoard indítása úgy, hogy a terminál megmaradjon
+   (új terminálban vagy háttérben futtatva)
+   tensorboard --logdir exp/logs --host 0.0.0.0 --port 6006
+   - Böngészőből: http://localhost:6006
+
+Hasznos gyors GPU-teszt (opcionális):
+   python - <<'PY'
+import torch, open3d
+print("torch", torch.__version__, "cuda?", torch.cuda.is_available(), "dev", torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)
+print("open3d", open3d.__version__)
+PY
