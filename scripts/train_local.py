@@ -21,9 +21,11 @@ sys.path.extend([
 ])
 
 from ml3d.utils import DATASET  # Registry
+from ml3d.tools import run_pipeline
 from datasets.hungary_lidar import HungaryLidar
+
 # Regisztráljuk a custom datasetet a torch registry-be
-DATASET.setdefault("torch", {})["HungaryLidar"] = HungaryLidar
+DATASET._register_module(HungaryLidar, framework="torch", module_name="HungaryLidar")
 
 ds_path = os.getenv("DATASET_PATH", "exp/tiles")
 
