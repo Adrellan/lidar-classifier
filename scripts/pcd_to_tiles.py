@@ -4,60 +4,110 @@ Gyors PCD -> Open3D-ML csempe konverter.
 Feltételezés: PCD-ben oszlopok: x y z label (ASCII vagy bináris).
 """
 import argparse
-import numpy as np
-from pathlib import Path
 import json
+from pathlib import Path
+import numpy as np
 
 CLASS_MAP = {2: 0, 3: 1, 4: 1, 5: 1, 6: 2, 7: 3, 14: 4, 16: 4, 17: 4, 18: 4, 19: 4}
 CLASS_NAMES = ["ground", "vegetation", "building", "noise", "other"]
 
 
-def load_pcd_ascii(path: Path):
-    """ASCII PCD olvasó: FIELDS header alapján keresi az x,y,z és label/class mezőket."""
-    lines = path.read_text().splitlines()
-    header = []
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
-        header.append(line)
-        if line.lower().startswith("data"):
-            data_start = i + 1
-            data_type = line.split()[1].lower()
+def parse_header_bytes(b: bytes):
+    """Parses PCD header from raw bytes. Returns (meta, data_offset)."""
+    lines = b.splitlines()
+    header_lines = []
+    data_offset = None
+    for i, ln in enumerate(lines):
+        if ln.startswith(b"DATA") or ln.startswith(b"data"):
+            header_lines = lines[: i + 1]
+            data_offset = len(b"\n".join(lines[: i + 1])) + 1
             break
-        i += 1
-    else:
-        raise ValueError(f"DATA sor nem található: {path}")
+    if data_offset is None:
+        raise ValueError("DATA line not found")
 
-    if data_type != "ascii":
-        raise ValueError(f"Csak ASCII PCD támogatott most: {path}")
+    meta = {}
+    for l in header_lines:
+        parts = l.decode("ascii").strip().split()
+        if not parts:
+            continue
+        key = parts[0].lower()
+        meta[key] = parts[1:]
+    return meta, data_offset
 
-    fields_line = next((l for l in header if l.lower().startswith("fields")), None)
-    if not fields_line:
-        raise ValueError(f"FIELDS sor hiányzik: {path}")
-    fields = fields_line.split()[1:]
 
+def header_indices(meta):
+    fields = meta.get("fields", [])
+    if not fields:
+        raise ValueError("FIELDS missing")
     try:
-        x_idx = fields.index("x")
-        y_idx = fields.index("y")
-        z_idx = fields.index("z")
-        if "label" in fields:
-            l_idx = fields.index("label")
-        elif "class" in fields:
-            l_idx = fields.index("class")
-        elif "classification" in fields:
-            l_idx = fields.index("classification")
-        else:
-            raise ValueError("Nincs label/classification mező a FIELDS-ben")
-    except ValueError as e:
-        raise ValueError(f"Hiányzó mező: {e}")
+        xi, yi, zi = fields.index("x"), fields.index("y"), fields.index("z")
+    except ValueError:
+        raise ValueError("x/y/z field missing")
+    label_keys = ["label", "class", "classification"]
+    li = None
+    for k in label_keys:
+        if k in fields:
+            li = fields.index(k)
+            break
+    if li is None:
+        raise ValueError("No label/classification field in FIELDS")
+    return fields, xi, yi, zi, li
 
-    data = np.loadtxt(lines[data_start:])
-    if data.ndim == 1:
-        data = data.reshape(1, -1)
-    pts = data[:, [x_idx, y_idx, z_idx]]
-    labels = data[:, l_idx].astype(int)
-    labels = np.vectorize(CLASS_MAP.get, otypes=[int])(labels)
-    return pts, labels
+
+def make_dtype(meta):
+    fields = meta["fields"]
+    sizes = list(map(int, meta.get("size", [])))
+    types = meta.get("type", [])
+    counts = list(map(int, meta.get("count", ["1"] * len(fields))))
+    if not (len(fields) == len(sizes) == len(types) == len(counts)):
+        raise ValueError("Header length mismatch in FIELDS/SIZE/TYPE/COUNT")
+    np_types = []
+    for s, t, c in zip(sizes, types, counts):
+        if t.lower() == "f":
+            base = {4: "f4", 8: "f8"}.get(s)
+        elif t.lower() == "u":
+            base = {1: "u1", 2: "u2", 4: "u4"}.get(s)
+        elif t.lower() == "i":
+            base = {1: "i1", 2: "i2", 4: "i4"}.get(s)
+        else:
+            base = None
+        if base is None:
+            raise ValueError(f"Unsupported type/size: {t}{s}")
+        if c == 1:
+            np_types.append(base)
+        else:
+            np_types.append((base, c))
+    return np_types
+
+
+def load_pcd(path: Path):
+    raw = path.read_bytes()
+    meta, data_offset = parse_header_bytes(raw)
+    fields, xi, yi, zi, li = header_indices(meta)
+    data_type = meta.get("data", ["ascii"])[0].lower()
+    if data_type == "ascii":
+        lines = raw[data_offset:].decode("utf-8").splitlines()
+        data = np.loadtxt(lines)
+        if data.ndim == 1:
+            data = data.reshape(1, -1)
+    elif data_type == "binary":
+        dtype = make_dtype(meta)
+        data = np.frombuffer(raw, offset=data_offset, dtype=np.dtype({"names": fields, "formats": dtype}))
+    else:
+        raise ValueError(f"DATA {data_type} nem támogatott (binary_compressed esetén konvertálni kell)")
+
+    if data_type == "binary":
+        x = np.asarray(data[fields[xi]], dtype=np.float32)
+        y = np.asarray(data[fields[yi]], dtype=np.float32)
+        z = np.asarray(data[fields[zi]], dtype=np.float32)
+        lbl = np.asarray(data[fields[li]], dtype=np.int64)
+        pts = np.vstack([x, y, z]).T
+    else:
+        pts = data[:, [xi, yi, zi]]
+        lbl = data[:, li].astype(np.int64)
+
+    lbl = np.vectorize(CLASS_MAP.get, otypes=[int])(lbl)
+    return pts, lbl
 
 
 def main():
