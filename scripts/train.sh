@@ -14,11 +14,11 @@ if [[ "${1:-}" == "--dataset_path" ]]; then
 fi
 
 # biztosítsuk, hogy az Open3D-ML forrás elérhető legyen
-export PYTHONPATH=$(pwd)/Open3D-ML:$(pwd)/Open3D-ML/ml3d:$(pwd):${PYTHONPATH:-}
+export PYTHONPATH=$(pwd)/Open3D-ML:$(pwd):${PYTHONPATH:-}
 
-CMD="python Open3D-ML/ml3d/tools/run_pipeline.py --cfg configs/randla_hungary.yaml --device cuda"
+CMD="python Open3D-ML/scripts/run_pipeline.py torch -c configs/randla_hungary.yaml --device cuda"
 if [[ -n "$DATASET_PATH" ]]; then
-  CMD+=" --override dataset.dataset_path=${DATASET_PATH}"
+  CMD+=" --dataset.dataset_path=${DATASET_PATH}"
 fi
 
 echo ">> $CMD"
