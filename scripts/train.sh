@@ -18,7 +18,7 @@ export PYTHONPATH=$(pwd)/Open3D-ML:$(pwd):${PYTHONPATH:-}
 
 CMD="python Open3D-ML/scripts/run_pipeline.py torch -c configs/randla_hungary.yaml --device cuda"
 if [[ -n "$DATASET_PATH" ]]; then
-  CMD+=" --dataset.dataset_path=${DATASET_PATH}"
+  CMD+=" --dataset.dataset_path ${DATASET_PATH}"
 fi
 
 echo ">> $CMD"
