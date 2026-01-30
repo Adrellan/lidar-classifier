@@ -55,24 +55,24 @@ def main(args):
     buckets = defaultdict(lambda: {"points": [], "labels": []})
 
     for path in las_files:
-        with laspy.read(path) as las:
-            x, y, z = las.x, las.y, las.z
-            raw_cls = las.classification
-            ix = np.floor((x - xmin) / tile_size).astype(int)
-            iy = np.floor((y - ymin) / tile_size).astype(int)
-            # pontok a legszélén: klippeljük rácsra
-            ix = np.clip(ix, 0, gx - 1)
-            iy = np.clip(iy, 0, gy - 1)
-            tile_id = ix + iy * gx
+        las = laspy.read(path)  # laspy.read nem context manager
+        x, y, z = las.x, las.y, las.z
+        raw_cls = las.classification
+        ix = np.floor((x - xmin) / tile_size).astype(int)
+        iy = np.floor((y - ymin) / tile_size).astype(int)
+        # pontok a legszélén: klippeljük rácsra
+        ix = np.clip(ix, 0, gx - 1)
+        iy = np.clip(iy, 0, gy - 1)
+        tile_id = ix + iy * gx
 
-            mapped = map_classes(raw_cls)
-            pts = np.stack((x, y, z), axis=1)
+        mapped = map_classes(raw_cls)
+        pts = np.stack((x, y, z), axis=1)
 
-            uniq_ids, inverse = np.unique(tile_id, return_inverse=True)
-            for uid in uniq_ids:
-                m = tile_id == uid
-                buckets[int(uid)]["points"].append(pts[m])
-                buckets[int(uid)]["labels"].append(mapped[m])
+        uniq_ids, inverse = np.unique(tile_id, return_inverse=True)
+        for uid in uniq_ids:
+            m = tile_id == uid
+            buckets[int(uid)]["points"].append(pts[m])
+            buckets[int(uid)]["labels"].append(mapped[m])
 
     out_dir = Path(args.output)
     out_dir.mkdir(parents=True, exist_ok=True)
