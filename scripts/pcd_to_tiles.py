@@ -126,7 +126,7 @@ def main():
 
     names = []
     for i, p in enumerate(pcds):
-        pts, lbl = load_pcd_ascii(p)
+        pts, lbl = load_pcd(p)
         name = f"pcd_{i:05d}"
         np.save(out_dir / f"{name}_points.npy", pts.astype(np.float32))
         np.save(out_dir / f"{name}_labels.npy", lbl.astype(np.int64))
