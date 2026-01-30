@@ -12,8 +12,8 @@ Lépések, ha már a train_data-ban vannak a .las/.laz fájlok
    (a kimenet Numpy csempék + split)
 
 3) Tanítás GPU-val (RandLA-Net)
-   - Alap (LAS/LAZ csempék): bash scripts/train.sh
-   - PCD-ből készült csempék: bash scripts/train.sh --dataset_path exp/tiles_pcd
+   - LAS/LAZ csempék: DATASET_PATH=exp/tiles python scripts/train_local.py
+   - PCD-ből készült csempék: DATASET_PATH=exp/tiles_pcd python scripts/train_local.py
    Logok, checkpointok: exp/logs alatt
 
 4) TensorBoard indítása úgy, hogy a terminál megmaradjon
