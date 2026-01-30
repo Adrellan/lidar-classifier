@@ -1,0 +1,44 @@
+save_ckpt_freq: 5          # hány epochonként mentsen checkpointot
+main_log_dir: /workspace/exp/logs  # ide kerülnek ckpt-k és logok
+
+model:
+  name: RandLANet
+  params:
+    num_classes: 5
+    d_out: [8, 16, 32, 64]
+    num_neighbors: 16
+    decimation: 4
+    use_xyz: true
+    dropout: 0.5
+    class_weights: [0.3, 0.7, 8.0, 2.0, 1.5]  # ground, vegetation, building, noise, other
+
+dataset:
+  name: HungaryLidar
+  dataset_path: /exp/tiles
+  cache_dir: /exp/cache
+  train_files: train
+  val_files: val
+  test_files: test
+
+training:
+  batch_size: 4
+  num_workers: 4
+  max_epoch: 150
+  lr: 0.01
+  lr_decay_steps: [80, 120]
+  lr_decay_factor: 0.5
+  weight_decay: 1e-4
+  scheduler: "step"
+  augment:
+    jitter: 0.01
+    rotate: [0, 0, 180]
+    scale: [0.95, 1.05]
+    color_drop: 0.0
+  sampler:
+    name: "default"
+    shuffle: true
+
+pipeline:
+  name: SemanticSegmentation
+  stages: ["train", "val"]
+  metrics: ["mIoU", "accuracy"]

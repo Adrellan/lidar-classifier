@@ -1,0 +1,40 @@
+services:
+  trainer:
+    image: registry.gitlab.envirosense.hu/ai-solutions/building-footprint-ai/o3d-ml-lidar:v1.0.4
+    working_dir: /workspace
+    environment:
+      PYTHONPATH: /workspace/Open3D-ML:/workspace
+    command:
+      - bash
+      - -lc
+      - |
+        pip install -e Open3D-ML/ml3d && \
+        python -m ml3d.tools.run_pipeline --cfg configs/randla_hungary.yaml --device cuda
+    volumes:
+      - ./:/workspace
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  tensorboard:
+    image: registry.gitlab.envirosense.hu/ai-solutions/building-footprint-ai/o3d-ml-lidar:v1.0.4
+    working_dir: /workspace
+    command:
+      - bash
+      - -lc
+      - tensorboard --logdir /workspace/exp/logs --host 0.0.0.0 --port 6006
+    volumes:
+      - ./:/workspace
+    ports:
+      - "6006:6006"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
