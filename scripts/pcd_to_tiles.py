@@ -6,6 +6,8 @@ Feltételezés: PCD-ben oszlopok: x y z label (ASCII vagy bináris).
 import argparse
 import json
 import zlib
+import subprocess
+import tempfile
 from pathlib import Path
 import numpy as np
 
@@ -86,43 +88,33 @@ def make_dtype(meta):
 
 
 def load_pcd(path: Path):
+    # Ha binary vagy binary_compressed, előbb konvertáljuk ASCII-re PCL-lel
+    with open(path, "rb") as f:
+        head = f.read(200).lower()
+    if b"data binary" in head:
+        pcl_path = subprocess.run(["which", "pcl_convert_pcd_ascii_binary"], capture_output=True, text=True)
+        if pcl_path.returncode != 0:
+            raise SystemExit("pcl_convert_pcd_ascii_binary nem elérhető a binary PCD konvertálásához.")
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td) / (path.stem + "_ascii.pcd")
+            subprocess.check_call(["pcl_convert_pcd_ascii_binary", str(path), str(tmp), "1"])
+            return load_pcd(tmp)  # most már ascii lesz
+
     raw = path.read_bytes()
     meta, data_offset = parse_header_bytes(raw)
     fields, xi, yi, zi, li = header_indices(meta)
     data_type = meta.get("data", ["ascii"])[0].lower()
     if data_type == "ascii":
-        lines = raw[data_offset:].decode("utf-8").splitlines()
+        lines = raw[data_offset:].decode("utf-8", errors="ignore").splitlines()
         data = np.loadtxt(lines)
         if data.ndim == 1:
             data = data.reshape(1, -1)
-    elif data_type == "binary":
-        dtype = make_dtype(meta)
-        data = np.frombuffer(raw, offset=data_offset, dtype=np.dtype({"names": fields, "formats": dtype}))
-    elif data_type == "binary_compressed":
-        # PCL binary_compressed: 4B compressed size, 4B uncompressed size, then zlib data
-        comp_size = np.frombuffer(raw, offset=data_offset, dtype=np.uint32, count=1)[0]
-        uncomp_size = np.frombuffer(raw, offset=data_offset + 4, dtype=np.uint32, count=1)[0]
-        comp_data = raw[data_offset + 8 : data_offset + 8 + comp_size]
-        buf = zlib.decompress(comp_data)
-        if len(buf) != uncomp_size:
-            raise ValueError(f"Decompressed size mismatch: expected {uncomp_size}, got {len(buf)}")
-        dtype = make_dtype(meta)
-        data = np.frombuffer(buf, dtype=np.dtype({"names": fields, "formats": dtype}))
     else:
-        raise ValueError(f"DATA {data_type} nem támogatott")
+        raise ValueError(f"DATA {data_type} nem támogatott ezen az úton")
 
-    if data_type == "binary":
-        x = np.asarray(data[fields[xi]], dtype=np.float32)
-        y = np.asarray(data[fields[yi]], dtype=np.float32)
-        z = np.asarray(data[fields[zi]], dtype=np.float32)
-        lbl_raw = np.asarray(data[fields[li]])
-        lbl = np.rint(lbl_raw).astype(np.int64) if lbl_raw.dtype.kind == "f" else lbl_raw.astype(np.int64)
-        pts = np.vstack([x, y, z]).T
-    else:
-        pts = data[:, [xi, yi, zi]]
-        lbl = data[:, li].astype(np.int64)
+    pts = data[:, [xi, yi, zi]]
+    lbl = data[:, li].astype(np.int64)
 
-    # Map to 5 osztály, ismeretlen kód -> 4 (other)
     lbl = np.array([CLASS_MAP.get(int(v), 4) for v in lbl], dtype=np.int64)
     return pts, lbl
 
