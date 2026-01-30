@@ -11,8 +11,10 @@ Használat:
 """
 import os
 import sys
+from pathlib import Path
 
-sys.path.extend([".", "Open3D-ML"])  # látja a saját kódot és az O3D-ML-t
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.extend([str(REPO_ROOT), str(REPO_ROOT / "Open3D-ML")])  # látja a saját kódot és az O3D-ML-t
 
 from ml3d.utils import DATASET  # Registry
 from datasets.hungary_lidar import HungaryLidar
