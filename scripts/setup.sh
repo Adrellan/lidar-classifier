@@ -34,6 +34,7 @@ pip install open3d
 pip install -e "$O3D_ML_DIR"
 
 # LAZ/LAS kezelő és hasznos libek + TensorBoard
-pip install "laspy[lazrs]" numpy pyyaml tqdm shapely tensorboard
+# Pin lazrs/laspy, mert a friss lazrs 0.6.3 nem talál backend dep-et egyes mirrorokon
+pip install --no-cache-dir laspy==2.5.1 lazrs==0.6.1 numpy pyyaml tqdm shapely tensorboard
 
 echo "Kész. Aktiváld: source $VENV_DIR/bin/activate"
