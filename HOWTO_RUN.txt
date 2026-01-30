@@ -6,13 +6,14 @@ Lépések, ha már a train_data-ban vannak a .las/.laz fájlok
 2) Előfeldolgozás (csempézés)
    - LAS/LAZ esetén:
      bash scripts/preprocess.sh train_data exp/tiles
-   - PCD esetén: tedd a .pcd-ket a pcd_data mappába, majd:
-     python scripts/pcd_to_tiles.py --input pcd_data --output exp/tiles_pcd
+   - PCD esetén: tedd a .pcd-ket a pcd_data mappába, konvertáld LAS-ra, majd csempézz:
+     bash scripts/pcd_to_las.sh pcd_data train_data_pcd_las
+     bash scripts/preprocess.sh train_data_pcd_las exp/tiles_pcd
    (a kimenet Numpy csempék + split)
 
 3) Tanítás GPU-val (RandLA-Net)
    - Alap (LAS/LAZ csempék): bash scripts/train.sh
-   - PCD csempék:           bash scripts/train.sh --dataset_path exp/tiles_pcd
+   - PCD-ből készült csempék: bash scripts/train.sh --dataset_path exp/tiles_pcd
    Logok, checkpointok: exp/logs alatt
 
 4) TensorBoard indítása úgy, hogy a terminál megmaradjon
