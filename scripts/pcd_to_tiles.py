@@ -26,6 +26,20 @@ def convert_to_ascii(src: Path) -> Path:
     return dst
 
 
+def detect_data_type(path: Path) -> str:
+    """Fejlécből kiolvassa a DATA típust (ascii/binary/binary_compressed)."""
+    with open(path, "rb") as f:
+        for line in f:
+            low = line.strip().lower()
+            if low.startswith(b"data"):
+                parts = low.split()
+                return parts[1].decode("ascii") if len(parts) > 1 else "ascii"
+            # gyors kilépés nagy file előtt
+            if f.tell() > 4096:
+                break
+    return "ascii"
+
+
 def load_ascii(path: Path):
     raw = path.read_bytes()
     lines = raw.decode("utf-8", errors="ignore").splitlines()
@@ -59,11 +73,10 @@ def load_ascii(path: Path):
 
 
 def load_pcd(path: Path):
-    # Döntsük el a DATA típust a header első 200 byte-jából
-    head = path.read_bytes()[:200].lower()
-    if b"data ascii" in head:
+    dtype = detect_data_type(path)
+    if dtype == "ascii":
         return load_ascii(path)
-    elif b"data binary" in head or b"data binary_compressed" in head:
+    elif dtype in ("binary", "binary_compressed"):
         ascii_path = convert_to_ascii(path)
         return load_ascii(ascii_path)
     else:
