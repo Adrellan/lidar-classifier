@@ -14,7 +14,7 @@ if [[ "${1:-}" == "--dataset_path" ]]; then
 fi
 
 # biztosítsuk, hogy az Open3D-ML forrás elérhető legyen
-export PYTHONPATH=$(pwd)/Open3D-ML:$(pwd):${PYTHONPATH:-}
+export PYTHONPATH=$(pwd)/Open3D-ML:$(pwd)/Open3D-ML/ml3d:$(pwd):${PYTHONPATH:-}
 
 CMD="python -m ml3d.tools.run_pipeline --cfg configs/randla_hungary.yaml --device cuda"
 if [[ -n "$DATASET_PATH" ]]; then
