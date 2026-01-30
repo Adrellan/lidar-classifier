@@ -31,7 +31,11 @@ def parse_header_bytes(b: bytes):
         if not parts:
             continue
         key = parts[0].lower()
-        meta[key] = parts[1:]
+        # mezőket lower-case-re hozzuk, hogy egységesen keressük őket
+        if key == "fields":
+            meta[key] = [p.lower() for p in parts[1:]]
+        else:
+            meta[key] = parts[1:]
     return meta, data_offset
 
 
@@ -100,7 +104,8 @@ def load_pcd(path: Path):
         x = np.asarray(data[fields[xi]], dtype=np.float32)
         y = np.asarray(data[fields[yi]], dtype=np.float32)
         z = np.asarray(data[fields[zi]], dtype=np.float32)
-        lbl = np.asarray(data[fields[li]], dtype=np.int64)
+        lbl_raw = np.asarray(data[fields[li]])
+        lbl = np.rint(lbl_raw).astype(np.int64) if lbl_raw.dtype.kind == "f" else lbl_raw.astype(np.int64)
         pts = np.vstack([x, y, z]).T
     else:
         pts = data[:, [xi, yi, zi]]
