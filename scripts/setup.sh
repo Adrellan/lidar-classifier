@@ -22,8 +22,10 @@ if [ ! -d "$O3D_ML_DIR" ]; then
   git clone --depth 1 https://github.com/isl-org/Open3D-ML.git "$O3D_ML_DIR"
 fi
 
-# Torch + CUDA páros és egyéb ML függőségek az Open3D-ML saját listájából
-pip install -r "$O3D_ML_DIR/requirements-torch-cuda.txt"
+# Torch + CUDA páros explicit (CU121 kerék, kompatibilis py3.8/driverrel)
+pip install --no-cache-dir \
+  torch==2.4.0+cu121 torchvision==0.19.0+cu121 \
+  --index-url https://download.pytorch.org/whl/cu121
 
 # Open3D kerék
 pip install open3d
