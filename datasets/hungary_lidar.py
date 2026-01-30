@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 
 import numpy as np
-from open3d.ml.torch.datasets.base_dataset import BaseDataset, BaseDatasetSplit
+# A lokális Open3D-ML forrásból importálunk
+from ml3d.datasets.base_dataset import BaseDataset, BaseDatasetSplit
 
 
 class HungaryLidar(BaseDataset):
