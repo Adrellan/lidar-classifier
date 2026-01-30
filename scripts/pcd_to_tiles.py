@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Gyors PCD -> Open3D-ML csempe konverter.
-Feltételezés: PCD-ben oszlopok: x y z label (ASCII vagy bináris).
+PCD -> Open3D-ML Numpy csempe konverter.
+Támogat: ASCII, binary, binary_compressed PCD (pcl_convert_pcd_ascii_binary segítségével).
+Elvárt mezők: x y z és classification (ASPRS kód).
 """
 import argparse
 import json
-import zlib
 import subprocess
 import tempfile
 from pathlib import Path
@@ -15,108 +15,59 @@ CLASS_MAP = {2: 0, 3: 1, 4: 1, 5: 1, 6: 2, 7: 3, 14: 4, 16: 4, 17: 4, 18: 4, 19:
 CLASS_NAMES = ["ground", "vegetation", "building", "noise", "other"]
 
 
-def parse_header_bytes(b: bytes):
-    """Parses PCD header from raw bytes. Returns (meta, data_offset)."""
-    lines = b.splitlines()
-    header_lines = []
-    data_offset = None
-    for i, ln in enumerate(lines):
-        if ln.startswith(b"DATA") or ln.startswith(b"data"):
-            header_lines = lines[: i + 1]
-            data_offset = len(b"\n".join(lines[: i + 1])) + 1
-            break
-    if data_offset is None:
-        raise ValueError("DATA line not found")
+def convert_to_ascii(src: Path) -> Path:
+    """Binary vagy binary_compressed PCD-t ASCII-ra konvertál PCL eszközzel."""
+    pcl = subprocess.run(["which", "pcl_convert_pcd_ascii_binary"], capture_output=True, text=True)
+    if pcl.returncode != 0:
+        raise SystemExit("pcl_convert_pcd_ascii_binary nem elérhető; telepítsd: sudo apt-get install pcl-tools")
+    tmpdir = Path(tempfile.mkdtemp())
+    dst = tmpdir / (src.stem + "_ascii.pcd")
+    subprocess.check_call(["pcl_convert_pcd_ascii_binary", str(src), str(dst), "1"])
+    return dst
 
-    meta = {}
-    for l in header_lines:
-        parts = l.decode("ascii").strip().split()
+
+def load_ascii(path: Path):
+    raw = path.read_bytes()
+    lines = raw.decode("utf-8", errors="ignore").splitlines()
+    hdr = {}
+    data_start = None
+    for i, l in enumerate(lines):
+        if l.lower().startswith("data"):
+            data_start = i + 1
+            break
+        parts = l.split()
         if not parts:
             continue
         key = parts[0].lower()
-        # mezőket lower-case-re hozzuk, hogy egységesen keressük őket
         if key == "fields":
-            meta[key] = [p.lower() for p in parts[1:]]
-        else:
-            meta[key] = parts[1:]
-    return meta, data_offset
+            hdr["fields"] = [p.lower() for p in parts[1:]]
+    if data_start is None:
+        raise ValueError(f"DATA sor hiányzik: {path}")
+    fields = hdr.get("fields", [])
+    xi = fields.index("x")
+    yi = fields.index("y")
+    zi = fields.index("z")
+    li = fields.index("classification")
 
-
-def header_indices(meta):
-    fields = meta.get("fields", [])
-    if not fields:
-        raise ValueError("FIELDS missing")
-    try:
-        xi, yi, zi = fields.index("x"), fields.index("y"), fields.index("z")
-    except ValueError:
-        raise ValueError("x/y/z field missing")
-    label_keys = ["label", "class", "classification"]
-    li = None
-    for k in label_keys:
-        if k in fields:
-            li = fields.index(k)
-            break
-    if li is None:
-        raise ValueError("No label/classification field in FIELDS")
-    return fields, xi, yi, zi, li
-
-
-def make_dtype(meta):
-    fields = meta["fields"]
-    sizes = list(map(int, meta.get("size", [])))
-    types = meta.get("type", [])
-    counts = list(map(int, meta.get("count", ["1"] * len(fields))))
-    if not (len(fields) == len(sizes) == len(types) == len(counts)):
-        raise ValueError("Header length mismatch in FIELDS/SIZE/TYPE/COUNT")
-    np_types = []
-    for s, t, c in zip(sizes, types, counts):
-        if t.lower() == "f":
-            base = {4: "f4", 8: "f8"}.get(s)
-        elif t.lower() == "u":
-            base = {1: "u1", 2: "u2", 4: "u4"}.get(s)
-        elif t.lower() == "i":
-            base = {1: "i1", 2: "i2", 4: "i4"}.get(s)
-        else:
-            base = None
-        if base is None:
-            raise ValueError(f"Unsupported type/size: {t}{s}")
-        if c == 1:
-            np_types.append(base)
-        else:
-            np_types.append((base, c))
-    return np_types
+    data = np.loadtxt(lines[data_start:])
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+    pts = data[:, [xi, yi, zi]].astype(np.float32)
+    lbl = data[:, li].astype(np.int64)
+    lbl = np.array([CLASS_MAP.get(int(v), 4) for v in lbl], dtype=np.int64)
+    return pts, lbl
 
 
 def load_pcd(path: Path):
-    # Ha binary vagy binary_compressed, előbb konvertáljuk ASCII-re PCL-lel
-    with open(path, "rb") as f:
-        head = f.read(200).lower()
-    if b"data binary" in head:
-        pcl_path = subprocess.run(["which", "pcl_convert_pcd_ascii_binary"], capture_output=True, text=True)
-        if pcl_path.returncode != 0:
-            raise SystemExit("pcl_convert_pcd_ascii_binary nem elérhető a binary PCD konvertálásához.")
-        with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td) / (path.stem + "_ascii.pcd")
-            subprocess.check_call(["pcl_convert_pcd_ascii_binary", str(path), str(tmp), "1"])
-            return load_pcd(tmp)  # most már ascii lesz
-
-    raw = path.read_bytes()
-    meta, data_offset = parse_header_bytes(raw)
-    fields, xi, yi, zi, li = header_indices(meta)
-    data_type = meta.get("data", ["ascii"])[0].lower()
-    if data_type == "ascii":
-        lines = raw[data_offset:].decode("utf-8", errors="ignore").splitlines()
-        data = np.loadtxt(lines)
-        if data.ndim == 1:
-            data = data.reshape(1, -1)
+    # Döntsük el a DATA típust a header első 200 byte-jából
+    head = path.read_bytes()[:200].lower()
+    if b"data ascii" in head:
+        return load_ascii(path)
+    elif b"data binary" in head or b"data binary_compressed" in head:
+        ascii_path = convert_to_ascii(path)
+        return load_ascii(ascii_path)
     else:
-        raise ValueError(f"DATA {data_type} nem támogatott ezen az úton")
-
-    pts = data[:, [xi, yi, zi]]
-    lbl = data[:, li].astype(np.int64)
-
-    lbl = np.array([CLASS_MAP.get(int(v), 4) for v in lbl], dtype=np.int64)
-    return pts, lbl
+        raise ValueError(f"Ismeretlen DATA formátum: {path}")
 
 
 def main():
@@ -137,16 +88,16 @@ def main():
     for i, p in enumerate(pcds):
         pts, lbl = load_pcd(p)
         name = f"pcd_{i:05d}"
-        np.save(out_dir / f"{name}_points.npy", pts.astype(np.float32))
-        np.save(out_dir / f"{name}_labels.npy", lbl.astype(np.int64))
+        np.save(out_dir / f"{name}_points.npy", pts)
+        np.save(out_dir / f"{name}_labels.npy", lbl)
         names.append(name)
 
-    # egyszerű 80/10/10 split
+    # 80/10/10 split
     rng = np.random.default_rng(42)
     rng.shuffle(names)
     n = len(names)
-    ntr = int(n * 0.8)
-    nv = int(n * 0.1)
+    ntr = int(0.8 * n)
+    nv = int(0.1 * n)
     (out_dir / "train.txt").write_text("\n".join(names[:ntr]))
     (out_dir / "val.txt").write_text("\n".join(names[ntr:ntr + nv]))
     (out_dir / "test.txt").write_text("\n".join(names[ntr + nv:]))
@@ -158,8 +109,7 @@ def main():
         "class_map": CLASS_MAP,
         "source": "PCD"
     }
-    with open(out_dir / "meta.json", "w") as f:
-        json.dump(meta, f, indent=2)
+    (out_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
     print(f"Kész: {len(names)} csempe -> {out_dir}")
 
