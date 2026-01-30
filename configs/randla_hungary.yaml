@@ -14,8 +14,8 @@ model:
 
 dataset:
   name: HungaryLidar
-  dataset_path: /exp/tiles
-  cache_dir: /exp/cache
+  dataset_path: exp/tiles    # Alapértelmezett: LAS/LAZ-ból csempézett
+  cache_dir: exp/cache
   train_files: train
   val_files: val
   test_files: test

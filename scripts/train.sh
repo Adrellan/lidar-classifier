@@ -4,8 +4,19 @@ set -euo pipefail
 # Tanítás indítása (RandLA-Net) a virtuális környezetből.
 # Használat:
 #   source .venv/bin/activate
-#   bash scripts/train.sh
+#   bash scripts/train.sh [--dataset_path <útvonal>]
+# Alapértelmezett dataset_path a configs/randla_hungary.yaml-ban: exp/tiles
 
-python -m ml3d.tools.run_pipeline \
-  --cfg configs/randla_hungary.yaml \
-  --device cuda
+DATASET_PATH=""
+if [[ "${1:-}" == "--dataset_path" ]]; then
+  DATASET_PATH="$2"
+  shift 2
+fi
+
+CMD="python -m ml3d.tools.run_pipeline --cfg configs/randla_hungary.yaml --device cuda"
+if [[ -n "$DATASET_PATH" ]]; then
+  CMD+=" --override dataset.dataset_path=${DATASET_PATH}"
+fi
+
+echo ">> $CMD"
+eval "$CMD"
