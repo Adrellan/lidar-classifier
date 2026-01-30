@@ -30,8 +30,8 @@ pip install --no-cache-dir \
 # Open3D kerék
 pip install open3d
 
-# Open3D-ML kód a lokális repóból
-pip install -e "$O3D_ML_DIR/ml3d"
+# Open3D-ML kód a lokális repóból (repo gyökérben van a setup.py)
+pip install -e "$O3D_ML_DIR"
 
 # LAZ/LAS kezelő és hasznos libek + TensorBoard
 pip install "laspy[lazrs]" numpy pyyaml tqdm shapely tensorboard
