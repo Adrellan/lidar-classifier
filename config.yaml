@@ -34,17 +34,17 @@ pipeline:
   stages: ["train", "val"]
   metrics: ["mIoU", "accuracy"]
   optimizer:
-    lr: 0.01
+    lr: 0.0003
     weight_decay: 1.0e-4
-  scheduler_gamma: 0.95
-  batch_size: 4
-  val_batch_size: 4
+  scheduler_gamma: 0.98
+  batch_size: 8
+  val_batch_size: 8
   test_batch_size: 4
   max_epoch: 150
   save_ckpt_freq: 5
   main_log_dir: runs/logs
   train_sum_dir: runs/logs/tensorboard
-  num_workers: 0
+  num_workers: 4
   pin_memory: true
   summary:
     record_for: []
