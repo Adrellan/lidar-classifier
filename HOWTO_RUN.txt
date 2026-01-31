@@ -11,9 +11,11 @@ Egyszerű futtatás (CUDA-s környezet feltételezve)
    - Tanulási paraméterek: pipeline.optimizer.lr, batch_size, max_epoch, stb.  
    - Csempézés: preprocess.tile_size_m, max_points_per_tile, train/val arányok
 
-4) Indítsd a tanítást  
-   - LAS/LAZ: python scripts/train.py --las  
-   - PCD:     python scripts/train.py --pcd
+4) Indítsd a tanítást (kötelező választani, hogy PCD vagy LAS):  
+   python scripts/train.py --pcd          # ha a train_data/pcd-ben van adat  
+   python scripts/train.py --las          # ha a train_data/las_laz-ban van adat  
+   python scripts/train.py --pcd --tensorboard   # ugyanaz, de elindítja a TensorBoard-ot 6006-on  
+   (flag nélkül: a script hibát jelez, mert választani kell)
 
 Automatikusan történik
 - PCD módban, ha nincs .las/.laz a train_data/pcd-ben, PDAL-lal konvertál.  
