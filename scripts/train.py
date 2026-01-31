@@ -265,13 +265,36 @@ def register_dataset():
         registry._register_module(HungaryLidar, module_name="HungaryLidar")
 
 
+def start_tensorboard(log_dir: Path, host: str = "0.0.0.0", port: int = 6006):
+    if shutil.which("tensorboard") is None:
+        print("TensorBoard nem elérhető (parancs: tensorboard). Telepítsd a csomagot, ha kell.")
+        return
+    tb_dir = log_dir / "tensorboard"
+    tb_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "tensorboard",
+        "--logdir",
+        str(tb_dir),
+        "--host",
+        host,
+        "--port",
+        str(port),
+    ]
+    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f"TensorBoard elindítva: http://{host}:{port}  (logdir: {tb_dir})")
+
+
 def launch_training(config_path: Path, tiles_dir: Path, cache_dir: Path,
-                    log_dir: Path, device: str):
+                    log_dir: Path, device: str, start_tb: bool = False,
+                    tb_port: int = 6006):
     register_dataset()
 
     cache_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
     (log_dir / "tensorboard").mkdir(parents=True, exist_ok=True)
+
+    if start_tb:
+        start_tensorboard(log_dir, port=tb_port)
 
     sys.argv = [
         "run_pipeline.py",
@@ -303,6 +326,8 @@ def main():
     group.add_argument("--pcd", action="store_true", help="Use train_data/pcd (auto-convert to LAS if needed)")
     parser.add_argument("--config", default="config.yaml", help="Training config file")
     parser.add_argument("--device", default="cuda", help="Device for training (cuda or cpu)")
+    parser.add_argument("--tensorboard", action="store_true", help="Indítsd el automatikusan a TensorBoard-ot (port 6006).")
+    parser.add_argument("--tb-port", type=int, default=6006, help="TensorBoard port (alap: 6006)")
     args = parser.parse_args()
 
     ensure_data_roots()
@@ -327,7 +352,8 @@ def main():
     log_dir = RUNS_ROOT / mode / "logs"
 
     preprocess_las_dir(las_dir, tiles_dir, tile_size, max_points, train_ratio, val_ratio)
-    launch_training(Path(args.config), tiles_dir, cache_dir, log_dir, args.device)
+    launch_training(Path(args.config), tiles_dir, cache_dir, log_dir, args.device,
+                    start_tb=args.tensorboard, tb_port=args.tb_port)
 
 
 if __name__ == "__main__":
