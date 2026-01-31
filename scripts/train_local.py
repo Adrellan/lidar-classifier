@@ -10,22 +10,45 @@ Használat:
   # DATASET_PATH=exp/tiles python scripts/train_local.py
 """
 import os
+import runpy
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.extend([
-    str(REPO_ROOT),
-    str(REPO_ROOT / "Open3D-ML"),
-    str(REPO_ROOT / "Open3D-ML" / "ml3d"),
-])
+custom_paths = [
+    REPO_ROOT,
+    REPO_ROOT / "Open3D-ML",
+]
 
-from ml3d.utils import DATASET  # Registry
-from ml3d.tools import run_pipeline
+# Ensure local sources shadow any globally installed ml3d package.
+for path in reversed(custom_paths):
+    str_path = str(path)
+    if str_path not in sys.path:
+        sys.path.insert(0, str_path)
+
 from datasets.hungary_lidar import HungaryLidar
 
-# Regisztráljuk a custom datasetet a torch registry-be
-DATASET._register_module(HungaryLidar, framework="torch", module_name="HungaryLidar")
+# Regisztráljuk a custom datasetet az összes elérhető registry-be
+dataset_registries = []
+try:
+    from ml3d import utils as local_utils
+except ImportError:
+    local_utils = None
+else:
+    dataset_registries.append(local_utils.DATASET)
+
+try:
+    import open3d.ml as o3d_ml
+except ImportError:
+    o3d_ml = None
+else:
+    dataset_registries.append(o3d_ml.utils.DATASET)
+
+if not dataset_registries:
+    raise ImportError("Nem található Open3D-ML dataset registry a HungaryLidar regisztrálásához.")
+
+for registry in dataset_registries:
+    registry._register_module(HungaryLidar, module_name="HungaryLidar")
 
 ds_path = os.getenv("DATASET_PATH", "exp/tiles")
 
@@ -39,5 +62,7 @@ sys.argv = [
     "--dataset.dataset_path",
     ds_path,
 ]
-
-run_pipeline.main()
+runpy.run_path(
+    str(REPO_ROOT / "Open3D-ML" / "scripts" / "run_pipeline.py"),
+    run_name="__main__",
+)
