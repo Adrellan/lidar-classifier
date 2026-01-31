@@ -23,8 +23,8 @@ model:
 
 dataset:
   name: HungaryLidar
-  dataset_path: exp/tiles    # Alapértelmezett: LAS/LAZ-ból csempézett
-  cache_dir: exp/cache
+  dataset_path: runs/las/tiles
+  cache_dir: runs/cache
   train_files: train
   val_files: val
   test_files: test
@@ -42,10 +42,16 @@ pipeline:
   test_batch_size: 4
   max_epoch: 150
   save_ckpt_freq: 5
-  main_log_dir: logs
-  train_sum_dir: logs/tensorboard
+  main_log_dir: runs/logs
+  train_sum_dir: runs/logs/tensorboard
   num_workers: 0
   pin_memory: true
   summary:
     record_for: []
     max_outputs: 1
+
+preprocess:
+  tile_size_m: 50.0
+  max_points_per_tile: 200000
+  train_ratio: 0.7
+  val_ratio: 0.15

@@ -1,29 +1,25 @@
-Lépések, ha már a train_data-ban vannak a .las/.laz fájlok
+Egyszerű futtatás (CUDA-s környezet feltételezve)
 
-1) Virtuális környezet aktiválása
+1) Aktiváld a virtuális környezetet  
    source .venv/bin/activate
 
-2) Előfeldolgozás (csempézés)
-   - LAS/LAZ esetén:
-     bash scripts/preprocess.sh train_data exp/tiles
-   - PCD esetén: tedd a .pcd-ket a pcd_data mappába, konvertáld LAS-ra, majd csempézz:
-     bash scripts/pcd_to_las.sh pcd_data train_data_pcd_las
-     bash scripts/preprocess.sh train_data_pcd_las exp/tiles_pcd
-   (a kimenet Numpy csempék + split)
+2) Tedd a nyers adatot a train_data alá  
+   - LAS/LAZ: train_data/las_laz  
+   - PCD: train_data/pcd  (ha itt nincs .las/.laz, a script konvertálja)
 
-3) Tanítás GPU-val (RandLA-Net)
-   - LAS/LAZ csempék: DATASET_PATH=exp/tiles python scripts/train_local.py
-   - PCD-ből készült csempék: DATASET_PATH=exp/tiles_pcd python scripts/train_local.py
-   Logok, checkpointok: exp/logs alatt
+3) Állítsd be a tanítási paramétereket a config.yaml-ben  
+   - Tanulási paraméterek: pipeline.optimizer.lr, batch_size, max_epoch, stb.  
+   - Csempézés: preprocess.tile_size_m, max_points_per_tile, train/val arányok
 
-4) TensorBoard indítása úgy, hogy a terminál megmaradjon
-   (új terminálban vagy háttérben futtatva)
-   tensorboard --logdir exp/logs --host 0.0.0.0 --port 6006
-   - Böngészőből: http://localhost:6006
+4) Indítsd a tanítást  
+   - LAS/LAZ: python scripts/train.py --las  
+   - PCD:     python scripts/train.py --pcd
 
-Hasznos gyors GPU-teszt (opcionális):
-   python - <<'PY'
-import torch, open3d
-print("torch", torch.__version__, "cuda?", torch.cuda.is_available(), "dev", torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)
-print("open3d", open3d.__version__)
-PY
+Automatikusan történik
+- PCD módban, ha nincs .las/.laz a train_data/pcd-ben, PDAL-lal konvertál.  
+- Újracsempéz minden futtatáskor a runs/<las|pcd>/tiles mappába.  
+- Logok és checkpointok: runs/<las|pcd>/logs, cache: runs/<las|pcd>/cache.
+
+Előfeltételek
+- PDAL CLI szükséges a PCD->LAS konverzióhoz.  
+- GPU-s futtatáshoz CUDA-s PyTorch + Open3D-ML legyen telepítve.

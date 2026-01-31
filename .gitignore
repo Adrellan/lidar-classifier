@@ -6,6 +6,7 @@ __pycache__/
 .venv/
 venv/
 env/
+.venv_view/
 
 # IDE-s
 .vscode/
@@ -18,7 +19,11 @@ env/
 # OS-es
 .DS_Store
 
+# Data & outputs
+train_data/
+runs/
 logs/
 exp/
 train_*
 pcd_*
+train_data/pcd/_converted_las/
