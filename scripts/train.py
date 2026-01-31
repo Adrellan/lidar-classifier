@@ -16,6 +16,7 @@ import math
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 
@@ -81,12 +82,49 @@ def convert_pcd_if_needed(pcd_dir: Path) -> Path:
         if dst.exists():
             continue
         print(f"[pcd->las] {src.name} -> {dst.name}")
-        subprocess.run(["pdal", "translate", str(src), str(dst)], check=True)
-        converted += 1
+        ok, err = pdal_translate(src, dst)
+        if not ok:
+            if "Binary compressed PCD is not supported" in err:
+                ok = convert_via_ascii(src, dst)
+            else:
+                raise SystemExit(f"PDAL translate failed for {src.name}: {err}")
+        if ok:
+            converted += 1
     if converted == 0 and not find_files(out_dir, ("las", "laz")):
         raise SystemExit("Conversion produced no LAS files; check PCD inputs.")
     print(f"PCD conversion done. Using LAS from {out_dir}.")
     return out_dir
+
+
+def pdal_translate(src: Path, dst: Path):
+    proc = subprocess.run(["pdal", "translate", str(src), str(dst)],
+                          capture_output=True, text=True)
+    if proc.returncode == 0:
+        return True, ""
+    return False, (proc.stderr or proc.stdout or "").strip()
+
+
+def convert_via_ascii(src: Path, dst: Path) -> bool:
+    """Fallback: decompress binary-compressed PCD with PCL, then PDAL translate."""
+    if shutil.which("pcl_convert_pcd_ascii_binary") is None:
+        raise SystemExit(
+            "Binary compressed PCD és nincs pcl_convert_pcd_ascii_binary. Telepítsd a pcl-tools csomagot."
+        )
+    tmpdir = Path(tempfile.mkdtemp(prefix="pcd_ascii_"))
+    ascii_path = tmpdir / f"{src.stem}_ascii.pcd"
+    try:
+        subprocess.run(
+            ["pcl_convert_pcd_ascii_binary", str(src), str(ascii_path), "1"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        ok, err = pdal_translate(ascii_path, dst)
+        if not ok:
+            raise SystemExit(f"PDAL translate (ASCII) failed for {src.name}: {err}")
+        return True
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def map_classes(raw_cls: np.ndarray) -> np.ndarray:
