@@ -1,0 +1,24 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# virtuális környezet
+.venv/
+venv/
+env/
+
+# IDE-s
+.vscode/
+.idea/
+*.sublime-project
+
+# Log
+*.log
+
+# OS-es
+.DS_Store
+
+logs/
+exp/
+train_*
+pcd_*
