@@ -61,21 +61,30 @@ def find_files(folder: Path, exts):
 
 
 def convert_pcd_if_needed(pcd_dir: Path) -> Path:
-    """Return a directory that contains LAS files for training."""
-    las_ready = find_files(pcd_dir, ("las", "laz"))
-    if las_ready:
-        print(f"Found {len(las_ready)} LAS/LAZ files under {pcd_dir}, skipping conversion.")
-        return pcd_dir
+    """Return a directory that contains LAS files for training.
 
+    Reuses earlier conversions and only converts new/changed PCD-k.
+    """
     pcd_files = find_files(pcd_dir, ("pcd",))
-    if not pcd_files:
-        raise FileNotFoundError("No .pcd files under train_data/pcd and no pre-converted .las files to use.")
+    las_in_root = find_files(pcd_dir, ("las", "laz"))
+    if not pcd_files and not las_in_root:
+        raise FileNotFoundError("Nincs .pcd vagy .las/.laz a train_data/pcd alatt.")
 
     if shutil.which("pdal") is None:
         raise SystemExit("PDAL CLI is required for PCD->LAS conversion (missing `pdal`).")
 
     out_dir = pcd_dir / "_converted_las"
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1) Másold át a már létező LAS/LAZ-okat a gyökérből (ha vannak).
+    copied = 0
+    for src in las_in_root:
+        dst = out_dir / src.name
+        if not dst.exists():
+            shutil.copy2(src, dst)
+            copied += 1
+
+    # 2) Konvertáld azokat a PCD-ket, amelyekhez még nincs LAS.
     converted = 0
     for src in pcd_files:
         dst = out_dir / f"{src.stem}.las"
@@ -90,9 +99,12 @@ def convert_pcd_if_needed(pcd_dir: Path) -> Path:
                 raise SystemExit(f"PDAL translate failed for {src.name}: {err}")
         if ok:
             converted += 1
-    if converted == 0 and not find_files(out_dir, ("las", "laz")):
+
+    las_ready = find_files(out_dir, ("las", "laz"))
+    if not las_ready:
         raise SystemExit("Conversion produced no LAS files; check PCD inputs.")
-    print(f"PCD conversion done. Using LAS from {out_dir}.")
+
+    print(f"LAS-ok a használathoz: {len(las_ready)} | újonnan konvertált: {converted} | átmásolt: {copied}")
     return out_dir
 
 
